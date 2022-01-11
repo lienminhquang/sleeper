@@ -11,14 +11,29 @@ import android.os.BatteryManager;
 import android.os.Build.VERSION;
 import android.os.Build.VERSION_CODES;
 import android.os.Bundle;
+import android.widget.Toast;
+import android.app.admin.DevicePolicyManager;
+import android.content.ComponentName;
+import android.content.Context;
+import android.app.Activity;
+import com.example.sleeper.DeviceAdmin;
 
 import io.flutter.embedding.android.FlutterActivity;
 
 public class MainActivity extends FlutterActivity {
     private static final String CHANNEL = "com.example.sleeper/battery";
 
+    static final int RESULT_ENABLE = 1;
+    DevicePolicyManager deviceManger;
+    ComponentName compName;
+
     @Override
     public void configureFlutterEngine(@NonNull FlutterEngine flutterEngine) {
+
+        compName = new ComponentName(this, DeviceAdmin.class);
+        deviceManger = (DevicePolicyManager)
+                getSystemService(Context.DEVICE_POLICY_SERVICE);
+
         super.configureFlutterEngine(flutterEngine);
         new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), CHANNEL).setMethodCallHandler(
             (call, result) -> {
@@ -32,7 +47,14 @@ public class MainActivity extends FlutterActivity {
                         result.error("UNAVAILABLE", "Batter level not available", null);
                     }
                 }
+                else if (call.method.equals("powerOff")) {
+                    Intent intent = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
+                    intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, compName);
+                    intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "You should enable the app!");
+                    startActivityForResult(intent, RESULT_ENABLE);
+                }
                 else {
+                    
                     result.notImplemented();
                 }
             }
@@ -52,5 +74,17 @@ public class MainActivity extends FlutterActivity {
             batteryLevel = (intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) * 100 / intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1));
         }
         return batteryLevel;
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        switch (requestCode) {
+            case RESULT_ENABLE:
+                if (resultCode == Activity.RESULT_OK) {
+                    deviceManger.lockNow();
+                }
+                return;
+        }
     }
 }
